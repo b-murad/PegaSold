@@ -51,30 +51,24 @@
 \twocolumn[
   \begin{@twocolumnfalse}
   \begin{center}
-    {\LARGE\bfseries Your Project Title Here:\\A Clear, Specific Subtitle\par}
+    {\LARGE\bfseries PegaSold: Predicting Baku Home Prices\\with Decision Trees, Pegasos SVM and Bagging Built from Scratch\par}
     \vspace{1.2em}
-    % Authors: Surname, Given name --- alphabetical by surname.
     {\large
-      Aliyeva, Aysel\quad Mammadov, Murad\quad Rustamli, Rustam\par}
+      Abdulhalimova, Emiliya\quad Asvarova, Aygun\quad Bagirzade, Murad\quad Karimli, Kenan\par}
     \vspace{0.5em}
     {\itshape MLE-AI-201 Machine Learning, AI Academy --- Cohort II\par}
     \vspace{1.4em}
   \end{center}
   \begin{quote}
     \small
-    \abstractkw{Abstract---}% IEEE uses an em-dash after "Abstract"
-    One paragraph, roughly 150--250 words. State the problem (price
-    prediction and the derived price-tier task on the bina.az dataset),
-    what you built from scratch (a decision tree and an SVM), the key
-    result (headline metrics vs.\ scikit-learn), and the main takeaway.
-    Write it last. \textbf{End the abstract with your repository link},
-    per IEEE convention:
-    \href{https://github.com/your-team/your-repo}{\texttt{github.com/your-team/your-repo}}
+    \abstractkw{Abstract---}%
+    We predict asking prices of Baku residential listings (Task~A, regression on log price) and a derived premium/standard price tier (Task~B, classification) from the bina.az dataset. After cleaning 100{,}775 raw rows to 57{,}003 and building 82 features, we implement a decision tree, a Pegasos SVM and a bagging ensemble of trees in plain NumPy, and compare them with scikit-learn at matched settings. Our tree and SVM match the references (validation RMSE 0.2383 vs.\ 0.2388; accuracy 0.903 vs.\ 0.908). Bagging 30 trees is best on both tasks: test $R^2=0.886$ with a typical error of 14.9\% for price, and test accuracy 0.934 with ROC-AUC 0.983 for the tier, a 20.9\% lower test MSE than a single tree. Error is largest for listings above 1M~AZN. Code:
+    \href{https://github.com/b-murad/PegaSold}{\texttt{github.com/b-murad/PegaSold}}
     (tag \texttt{v1.0-final}).
 
     \vspace{0.6em}
     \abstractkw{Index Terms---}decision tree, support-vector machine,
-    Pegasos, regression, classification, real-estate price prediction.
+    Pegasos, bagging, regression, classification, real-estate price prediction.
   \end{quote}
   \vspace{1.0em}
   \end{@twocolumnfalse}
@@ -82,95 +76,19 @@
 
 % =====================================================================
 \section{Introduction}
-Motivate the problem and state your contributions as a short bulleted or
-inline list. What is the task, why does it matter, and what did your
-team do? Keep background brief; cite sources like this~\cite{pegasos}.
+Buyers and sellers in Baku have little way to judge whether an asking price is reasonable. We use the bina.az listing scrape to build two predictors: the price itself (Task~A) and whether a listing is above or below the median price (Task~B). The brief requires the decision tree and the SVM to be our own NumPy code, with scikit-learn used only as a baseline. Our contributions are: (i) a documented cleaning pipeline with 61 automated checks and no train/test leakage; (ii) from-scratch tree, Pegasos SVM and bagging ensemble that match scikit-learn; (iii) measured design choices (ensemble depth, SVM regularisation); and (iv) an error analysis showing where the models fail. A small web demo serves the trained models~\cite{pegasos}.
 
 \section{Related Work / Background}
-Briefly place your work in context: decision trees (impurity, information
-gain), the soft-margin SVM and the hinge-loss primal, and the Pegasos
-sub-gradient solver you used~\cite{pegasos}. One or two short paragraphs.
+A decision tree greedily chooses the split that most reduces an impurity measure (Gini or entropy for classes, squared error for targets). Bagging averages trees fit to bootstrap samples, cancelling variance without changing bias. The soft-margin SVM minimises hinge loss plus an $L_2$ penalty; Pegasos~\cite{pegasos} solves this primal problem with stochastic sub-gradient steps of size $1/(\lambda t)$, so no quadratic-programming solver is needed.
 
-\section{Data and Preprocessing}
-Describe the bina.az dataset: size, key columns, and the cleaning you
-did (currency, types, missing values, duplicates, outliers). State the
-two tasks (price regression; price-tier classification), how you derived
-the tier label, and your train/validation/test split. \textbf{Name the
-leakage columns you removed and why.}
+\input{sections/data}
 
-\begin{table}[t]
-  \centering
-  \caption{Dataset summary after cleaning.}
-  \label{tab:data}
-  \begin{tabular}{@{}lr@{}}
-    \toprule
-    Property & Value \\
-    \midrule
-    Rows (after cleaning)       & --- \\
-    Features used               & --- \\
-    Train / Val / Test split    & --- / --- / --- \\
-    Price-tier balance (\%)     & --- \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\input{sections/models}
 
-\section{Method}
-\subsection{Decision tree (from scratch)}
-Describe your impurity criteria (Gini / entropy / MSE reduction), the
-split search, recursion, leaf rule, and hyperparameters.
-
-\subsection{Support-vector machine (from scratch)}
-State the objective and the Pegasos update you implemented:
-\begin{equation}
-  J(\mathbf{w},b)=\tfrac{\lambda}{2}\lVert\mathbf{w}\rVert^{2}
-  +\tfrac{1}{n}\sum_{i=1}^{n}\max\!\big(0,\,1-y_i(\mathbf{w}^{\top}\mathbf{x}_i+b)\big).
-\end{equation}
-Explain the learning-rate schedule, feature scaling, and your non-linear
-extension (kernelised Pegasos or random Fourier features), if any.
-
-\section{Experimental Setup}
-Metrics (RMSE/MAE/$R^2$ for regression; precision/recall/F1/AUC for
-classification), hyperparameter search protocol, seeds, and the
-scikit-learn baselines you compared against (with matched settings).
-
-\section{Results}
-Lead with a results table; back every claim with a number or figure.
-
-\begin{table}[t]
-  \centering
-  \caption{Headline results (test set, mean $\pm$ std over folds).}
-  \label{tab:results}
-  \begin{tabular}{@{}lcc@{}}
-    \toprule
-    Model & Task A (RMSE) & Task B (F1) \\
-    \midrule
-    Ours: decision tree     & --- & --- \\
-    Ours: SVM (Pegasos)     & n/a & --- \\
-    scikit-learn baseline   & --- & --- \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\begin{figure}[t]
-  \centering
-  % \includegraphics[width=\linewidth]{figures/your_plot.pdf}
-  \fbox{\parbox[c][3.2cm][c]{0.9\linewidth}{\centering\small
-    Replace with a figure (e.g.\ validation curve, confusion matrix,
-    or feature importances). Save plots to \texttt{figures/}.}}
-  \caption{One clear figure beats ten decorative ones.}
-  \label{fig:main}
-\end{figure}
-
-\section{Discussion and Limitations}
-Where and why each model fails (luxury outliers, sparse districts,
-scaling effects), the bias--variance story, and honest limitations.
-
-\section{Conclusion}
-One short paragraph: what you found and what you would do next.
+\input{sections/results}
 
 \section*{Tools and Acknowledgements}
-Disclose any AI-assistant use and what it was used for, plus data/code
-you built on. (Required.)
+The tree, SVM and ensemble are our own NumPy code. scikit-learn is used only for baselines and correctness checks, as the brief allows. An AI coding assistant (Claude Code) was used to help write unit tests, documentation, the web demo and drafts of this report; the team reviewed all code and checked every number against the files in \texttt{reports/}. Data: bina.az listings supplied with the course.
 
 % =====================================================================
 \begin{thebibliography}{9}

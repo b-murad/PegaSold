@@ -4,7 +4,7 @@
     python -m src.run_all --fast       # smoke test (minutes, not final numbers)
     python -m src.run_all --skip-prep  # reuse data/processed, re-score only
 
-Pipeline: data_prep -> validate -> explore (EDA) -> evaluate -> summary.
+Pipeline: data_prep -> validate -> explore (EDA) -> evaluate -> experiments -> summary.
 
 Every seed is fixed (RANDOM_SEED = 42 in src/data_prep.py and src/evaluate.py),
 so two runs on the same CSV produce the same numbers.
@@ -131,6 +131,8 @@ def main() -> int:
                    help="skip explore.py (the slowest non-model step)")
     p.add_argument("--no-ensemble", action="store_true",
                    help="skip bagging (saves most of the model runtime)")
+    p.add_argument("--skip-experiments", action="store_true",
+                   help="skip src.experiments (RFF SVM, cross-validation, web report data)")
     a = p.parse_args()
     start = time.time()
 
@@ -168,7 +170,13 @@ def main() -> int:
         cmd.append("--no-ensemble")
     sh(*cmd)
 
-    # 5. one-page summary pointing at the artifacts
+    # 5. extra experiments from the decision-tree branch + web report data
+    if a.skip_experiments or a.fast:
+        print("\n[skip-experiments] src.experiments not run")
+    else:
+        sh(sys.executable, "-m", "src.experiments")
+
+    # 6. one-page summary pointing at the artifacts
     print("\n$ write summary")
     write_summary(a.processed, a.fig_out, time.time() - start)
 
