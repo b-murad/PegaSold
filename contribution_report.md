@@ -4,7 +4,7 @@
 | Member (Surname, Name) | GitHub handle | Main responsibilities |
 |------------------------|---------------|-----------------------|
 | Abdulhalimova, Emiliya | `emiliyabdul` | Data cleaning, EDA, error analysis |
-| Asvarova, Aygun | `[handle]` | Feature engineering, scaling, model selection |
+| Asvarova, Aygun | `dionyyssus` | Feature engineering, scaling, model selection |
 | Karimli, Kenan | `kenan-karimli` | Decision tree, bagging ensemble |
 | Bagirzade, Murad | `muradb24` | SVM, metrics, data validation, orchestration |
 
