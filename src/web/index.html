@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f7f8">
+  <meta name="description" content="Estimate a Baku home's asking price with PegaSold.">
+  <title>PegaSold — Home Price Estimate</title>
+  <link rel="icon" href="favicon.svg?v=3" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="demo.css"><script src="demo.js" defer></script>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="#top" aria-label="PegaSold home"><img src="assets/pegasold-logo.png" alt="PegaSold logo"><span class="brand-name">PegaSold <i>//</i></span><span class="brand-caption">BAKU PROPERTY PRICES</span></a>
+  <nav><a class="nav-active" href="#estimate">Estimate</a><a href="report.html">Project report</a></nav>
+  <a class="button button-lime top-action" href="#estimate">Estimate price <span aria-hidden="true">↗</span></a>
+</div></header>
+<main id="top">
+  <section class="hero wrap">
+    <div class="hero-copy"><div class="eyebrow"><span class="live-dot"></span> PEGASOLD · BAKU</div>
+      <h1>Estimate your home's<br><span>asking price.</span></h1>
+      <p>Choose a few property details to see an estimated price and price tier.</p>
+      <div class="hero-meta"><span><b class="meta-mark">01</b> Bina.az listings</span><span><b class="meta-mark">02</b> <span id="hero-rows">-</span> training listings</span></div>
+    </div>
+    <aside class="hero-note"><span class="note-icon">PS</span><span class="eyebrow">PROPERTY SNAPSHOT</span><strong>Three residential types</strong><p>Based on historical Bina.az asking prices in Baku.</p><a href="report.html">View results <span>↗</span></a></aside>
+  </section>
+
+  <section class="wrap metric-grid" aria-label="Dataset summary">
+    <article class="metric-card"><div class="metric-label">Training listings <span>▦</span></div><strong id="stat-rows">—</strong><small>cleaned Bina.az records</small></article>
+    <article class="metric-card"><div class="metric-label">Premium cutoff <span>⌁</span></div><strong id="stat-threshold">—</strong><small>training-set median</small></article>
+    <article class="metric-card"><div class="metric-label">Property types <span>⌂</span></div><strong>3 types</strong><small>Baku residential listings</small></article>
+    <article class="metric-card"><div class="metric-label">Output <span>✳</span></div><strong>Price + tier</strong><small>two trained decision trees</small></article>
+  </section>
+
+  <section class="wrap workspace" id="estimate">
+    <form class="panel form-panel" id="estimate-form">
+      <div class="panel-heading"><div><span class="eyebrow">PROPERTY DETAILS</span><h2>Tell us about the home</h2></div><span class="step-pill"><span class="live-dot"></span> <span id="model-state">Connecting</span></span></div>
+      <div class="form-grid">
+        <label class="field field-wide">Property type<select id="category" name="category" required></select></label>
+        <label class="field">Baku area<select id="location" name="location" required></select></label>
+        <label class="field">Floor area<div class="input-suffix"><input id="area" name="area_m2" type="number" min="10" max="2000" step="1" value="90" required><span>m²</span></div></label>
+        <label class="field">Rooms<select id="rooms" name="rooms" required></select></label>
+        <div class="field field-wide floor-fields" id="floor-fields"><div class="field-row"><label class="field">Floor<input id="floor" name="floor" type="number" min="1" max="100" value="5"></label><label class="field">Building floors<input id="n-floors" name="n_floors" type="number" min="1" max="100" value="12"></label></div></div>
+        <label class="field field-wide land-field" id="land-field">Land area <span class="muted-inline">(optional)</span><div class="input-suffix"><input id="land" name="land_m2" type="number" min="0" max="200000" step="1" value="0"><span>m²</span></div></label>
+      </div>
+      <div class="toggle-section"><span class="field-title">Features</span><div class="toggle-grid">
+        <label class="toggle"><input type="checkbox" name="has_repair" checked><span class="switch"></span><span>Repaired</span></label>
+        <label class="toggle"><input type="checkbox" name="has_bill_of_sale" checked><span class="switch"></span><span>Title deed</span></label>
+        <label class="toggle"><input type="checkbox" name="has_mortgage"><span class="switch"></span><span>Mortgage eligible</span></label>
+      </div></div>
+      <div class="form-foot"><span><span class="lock-mark">i</span> Location coordinates use training-listing medians.</span><button class="button button-lime submit-button" id="submit-button" type="submit">Estimate price <span aria-hidden="true">→</span></button></div>
+    </form>
+
+    <aside class="panel result-panel" aria-live="polite">
+      <div class="result-top"><div><span class="eyebrow">ESTIMATE</span><h2>Price overview</h2></div><span class="result-mark">PS</span></div>
+      <div class="result-placeholder" id="result-placeholder"><span class="placeholder-icon">↗</span><strong>Your estimate will appear here</strong><p>Enter the property details and calculate a price.</p></div>
+      <div class="result-output hidden" id="result-output">
+        <div class="result-label">Estimated asking price</div><div class="price" id="price-value">—</div>
+        <div class="sub-metric"><span>Estimated price / m²</span><strong id="sqm-value">—</strong></div>
+        <div class="tier-card"><div><span class="eyebrow">PRICE TIER</span><strong id="tier-value">—</strong></div><span class="tier-symbol" id="tier-symbol">✳</span></div>
+        <div class="probability"><div class="probability-head"><span>Share of this class in the leaf</span><strong id="probability-value">—</strong></div><div class="bar"><i id="probability-bar"></i></div><small>Descriptive leaf share; not calibrated confidence.</small></div>
+        <div class="estimate-summary" id="estimate-summary"></div>
+      </div>
+      <div class="result-error hidden" id="result-error"></div>
+      <div class="result-disclaimer"><span>!</span><p>Based on historical asking prices, not verified sale prices or a current appraisal.</p></div>
+    </aside>
+  </section>
+
+  <section class="wrap data-note"><div class="data-icon">!</div><div><span class="eyebrow">IMPORTANT</span><h2>Historical listings only</h2><p>This estimate reflects 2024 Bina.az asking-price data. It may not represent today's market or the final sale price.</p></div></section>
+</main>
+<footer class="footer"><div class="wrap footer-inner"><div><a class="brand footer-brand" href="#top"><img src="assets/pegasold-logo.png" alt=""><span class="brand-name">PegaSold <i>//</i></span><span class="brand-caption">PROPERTY PRICE ESTIMATION</span></a><p>Baku residential listing analysis.</p></div><div class="footer-status"><span class="live-dot"></span><span id="footer-status">Connecting</span></div><div class="footer-links"><a href="#estimate">Estimate</a><a href="report.html">Report</a><a href="presentation/slides.pdf">Slides</a></div></div><div class="wrap footer-bottom"><span>MLE-AI-201 · Team PegaSold</span><span>Historical listing data</span></div></footer>
+</body></html>

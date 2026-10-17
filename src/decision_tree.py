@@ -31,6 +31,8 @@ class TreeNode:
         self.threshold = threshold
         self.left = left
         self.right = right
+        self.impurity_decrease = 0.0
+        self.n_samples = 0
 
 class DecisionTree:
     """Decision tree interface for classification and regression.
@@ -132,6 +134,15 @@ class DecisionTree:
         self.classes_ = np.unique(y) if self.task == "classification" else None
         # Grow the whole tree recursively, starting at depth 0
         self.root = self._build_tree(X, y, depth=0)
+        importances = np.zeros(self.n_features_in_, dtype=float)
+        def collect_importance(node):
+            if node.feature_index is not None:
+                importances[node.feature_index] += node.n_samples * node.impurity_decrease
+                collect_importance(node.left)
+                collect_importance(node.right)
+        collect_importance(self.root)
+        total_importance = importances.sum()
+        self.feature_importances_ = importances / total_importance if total_importance > 0 else importances
 
         return self
 
@@ -215,92 +226,76 @@ class DecisionTree:
         left_child = self._build_tree(X_left, y_left, depth + 1)
         right_child = self._build_tree(X_right, y_right, depth + 1)
 
-        return TreeNode( feature_index=feature_index, threshold=threshold, left=left_child, right=right_child )
+        node = TreeNode(feature_index=feature_index, threshold=threshold, left=left_child, right=right_child)
+        node.n_samples = len(y)
+        node.impurity_decrease = float(best_split[2])
+        return node
 
     def _best_split(self, X, y):
-        """
-        Search every feature and threshold and return the best split.
+        """Search features and thresholds; return the best useful split.
 
-        Each feature is sorted once, and cumulative sums give the impurity of
-        every possible left/right division in one pass, instead of recomputing
-        it for each threshold.
-
-        :param X: 2D feature array for the rows at this node.
-        :param y: 1D targets for those rows.
-        :return: (feature_index, threshold, gain), or None if no split helps.
+        For numeric features, candidate thresholds can be placed between
+        neighboring distinct feature values. Evaluate each split with
+        _split_score. Return (feature_index, threshold, gain), or None when no
+        split improves the parent node.
         """
         n_samples, n_features = X.shape
-        # Starting at min_impurity_decrease means only splits that beat it can win
-        best_gain, best_feature, best_threshold = self.min_impurity_decrease, None, None
 
-        # Quantities that do not depend on the feature, computed once per node
+        best_gain, best_feature, best_threshold = -np.inf, None, None
+        n = len(y)
         if self.task == "classification":
-            _, encoded = np.unique(y, return_inverse=True)       # labels -> 0..k-1
-            class_count = encoded.max() + 1
-            onehot = np.eye(class_count, dtype=float)[encoded]   # one row per sample, one column per class
-            total_counts = onehot.sum(axis=0)
-            parent_score = self._impurity(y)
+            _, encoded = np.unique(y, return_inverse=True)
+            k = encoded.max() + 1
+            onehot = np.eye(k, dtype=float)[encoded]
+            total = onehot.sum(axis=0)
         else:
-            # Centre y first: variance from sums of squares loses precision on large values
-            yy = y.astype(float) - np.mean(y)
+            # Center the target before prefix-summing squares. Regression
+            # targets here are log(AZN), typically around 12; computing
+            # E[y^2] - E[y]^2 from those large offsets loses precision for
+            # small child nodes and can change which near-tied split wins.
+            # Variance and every MSE split gain are translation invariant.
+            yy = y.astype(float)
+            yy = yy - yy.mean()
             total_sum, total_sq = yy.sum(), np.dot(yy, yy)
-            parent_score = float(total_sq / n_samples)           # MSE of the parent node
+        parent_score = self._impurity(yy) if self.task == "regression" else self._impurity(y)
 
         for feature_index in range(n_features):
-            # Sort rows by this feature; mergesort is stable, so results are reproducible
             order = np.argsort(X[:, feature_index], kind="mergesort")
             values = X[order, feature_index]
-
-            # A split is only possible between two different neighbouring values
+            # A boundary is possible only between unequal adjacent feature values.
             positions = np.flatnonzero(values[:-1] < values[1:]) + 1
-            # min_samples_leaf: keep only splits where both sides are big enough
-            positions = positions[(positions >= self.min_samples_leaf) & (n_samples - positions >= self.min_samples_leaf)]
+            positions = positions[(positions >= self.min_samples_leaf) &
+                                  (n - positions >= self.min_samples_leaf)]
             if not positions.size:
                 continue
-
-            # Threshold halfway between the two neighbouring values
             thresholds = values[positions - 1] + (values[positions] - values[positions - 1]) / 2
-            nl, nr = positions.astype(float), (n_samples - positions).astype(float)   # left/right sizes per candidate
-
             if self.task == "classification":
-                # Class counts on the left of every candidate; the right side is the remainder
                 left_counts = np.cumsum(onehot[order], axis=0)[positions - 1]
-                right_counts = total_counts - left_counts
-
+                right_counts = total - left_counts
+                nl, nr = positions.astype(float), (n - positions).astype(float)
                 if self.criterion == "gini":
-                    # Gini = 1 - sum(p^2), with p = count / size
                     il = 1.0 - np.sum(left_counts ** 2, axis=1) / nl ** 2
                     ir = 1.0 - np.sum(right_counts ** 2, axis=1) / nr ** 2
                 else:
                     def entropy(counts, sizes):
                         probs = counts / sizes[:, None]
-                        # maximum() avoids log2(0); where() makes those terms contribute 0
                         return -np.sum(np.where(probs > 0, probs * np.log2(np.maximum(probs, 1e-300)), 0), axis=1)
-
                     il, ir = entropy(left_counts, nl), entropy(right_counts, nr)
             else:
-                # Variance = E[y^2] - E[y]^2, computed from prefix sums for each candidate
                 sorted_y = yy[order]
                 prefix = np.cumsum(sorted_y)
                 prefix_sq = np.cumsum(sorted_y ** 2)
-                left_sum = prefix[positions - 1]
-                left_sq = prefix_sq[positions - 1]
-                right_sum, right_sq = total_sum - left_sum, total_sq - left_sq
-                # maximum(0, ...) guards against tiny negative values from rounding
-                il = np.maximum(0.0, left_sq / nl - (left_sum / nl) ** 2)
-                ir = np.maximum(0.0, right_sq / nr - (right_sum / nr) ** 2)
-
-            # Gain = parent impurity minus the size-weighted child impurity
-            gains = parent_score - (nl / n_samples * il + nr / n_samples * ir)
-            local = int(np.argmax(gains))   # best candidate for this feature
+                nl, nr = positions.astype(float), (n - positions).astype(float)
+                sl, sql = prefix[positions - 1], prefix_sq[positions - 1]
+                sr, sqr = total_sum - sl, total_sq - sql
+                il = np.maximum(0.0, sql / nl - (sl / nl) ** 2)
+                ir = np.maximum(0.0, sqr / nr - (sr / nr) ** 2)
+            gains = parent_score - (positions / n * il + (n - positions) / n * ir)
+            local = int(np.argmax(gains))
             gain = float(gains[local])
+            if gain > best_gain and gain >= self.min_impurity_decrease:
+                best_gain, best_feature, best_threshold = gain, feature_index, float(thresholds[local])
 
-            # Keep it only if it beats the best split found on earlier features
-            if gain > best_gain:
-                best_gain, best_feature = gain, feature_index
-                best_threshold = float(thresholds[local])
-
-        # Nothing beat min_impurity_decrease (or no valid split existed)
         if best_feature is None:
             return None
 
@@ -322,8 +317,7 @@ class DecisionTree:
         if self.task == "classification" and len(np.unique(y)) == 1:    return True
 
         # Regression equivalent of "pure": all targets identical, so MSE is 0
-        # (relies on _impurity, which is implemented by a teammate)
-        return self.task == "regression" and self._impurity(y) == 0
+        return self.task == "regression" and bool(np.all(y == y[0]))
 
     def _leaf_value(self, y):
         """
@@ -351,6 +345,7 @@ class DecisionTree:
         :return: A TreeNode with no split, only a value.
         """
         node = TreeNode(value=prediction)
+        node.n_samples = len(y)
 
         if self.task == "classification":
             values, counts = np.unique(y, return_counts=True)

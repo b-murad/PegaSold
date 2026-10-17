@@ -1,0 +1,25 @@
+% Sections IV-V -- Method and Experimental Setup  (owner: Kenan Karimli)
+\section{Method}
+\subsection{Decision tree (from scratch, NumPy)}
+The tree is grown recursively. At every node, \texttt{\_best\_split} tries every threshold, midway between neighbouring sorted values, on every feature and keeps the split with the largest size-weighted impurity reduction. Classification uses Gini or entropy and regression uses mean squared error; a leaf predicts the majority class or the mean target. Growth stops at the depth cap, when a node has fewer rows than the minimum, or when it is pure. We also enforce a minimum leaf size and a minimum impurity decrease. Classification leaves store their class counts, so \texttt{predict\_proba} returns class frequencies; this is what makes ROC-AUC meaningful. Each split node records its size and gain, giving impurity-based feature importances.
+
+\subsection{Support-vector machine (Pegasos)}
+We minimise the primal soft-margin objective with the Pegasos sub-gradient method,
+\begin{equation}
+  J(\mathbf{w},b)=\tfrac{\lambda}{2}\lVert\mathbf{w}\rVert^{2}
+  +\tfrac{1}{n}\sum_{i=1}^{n}\max\!\big(0,\,1-y_i(\mathbf{w}^{\top}\mathbf{x}_i+b)\big),
+\end{equation}
+visiting one listing at a time with step size $\eta_t=1/(\lambda t)$. A misclassified or in-margin point pushes the boundary; regularisation shrinks $\mathbf{w}$ but not the intercept $b$, whose step is capped at 1. After every update $\mathbf{w}$ is projected back onto the ball $\lVert\mathbf{w}\rVert\le 1/\sqrt{\lambda}$, as in the original algorithm~\cite{pegasos}. Features are already standardised from training statistics. We track the objective per epoch and report support vectors and the margin width $2/\lVert\mathbf{w}\rVert$. Because Pegasos optimises hinge loss rather than accuracy, we also tune the decision threshold on validation.
+
+\subsection{Nonlinear SVM (random Fourier features)}
+To test a nonlinear boundary without a kernel solver, we map the scaled features through 128 random Fourier features, $\sqrt{2/D}\cos(\mathbf{x}^{\top}W+\mathbf{b})$ with $W\sim\mathcal{N}(0,2\gamma)$, which approximates an RBF kernel, and train the same Pegasos solver on the mapped data. $\gamma$ is chosen from $\{0.01,0.1,1\}$ on validation using an 8{,}000-row training sample; an RBF \texttt{SVC} on the same rows is the reference.
+
+\subsection{Bagging ensemble}
+\texttt{BaggedTrees} trains 30 of our trees, each on 6{,}000 rows drawn with replacement. Regression averages the members. Classification uses soft voting: it averages class probabilities rather than counting votes, and handles a bootstrap sample that misses a class. Out-of-bag scoring judges each training row only by the trees that never saw it, giving a held-out estimate without touching validation data. We grow members to depth 16, deeper than the single tree's tuned depth, because averaging controls variance. Feature subsampling, as in a random forest, was tried and did not help here, so this is plain bagging.
+
+\section{Experimental Setup}
+\textbf{Metrics.} Task~A: MSE, RMSE, MAE and $R^2$ on log price, plus a typical error in percent, $e^{\text{MAE}}-1$. Task~B: accuracy and ROC-AUC.
+
+\textbf{Tuning.} Tree depth is swept over $\{2,4,\dots,16,20\}$ and the SVM $\lambda$ over $\{10^{-4},10^{-3},10^{-2},10^{-1}\}$, both on a fixed 6{,}000-row training subsample and chosen on validation, because our exact tree is slow. Final models are then trained on all 39{,}902 rows. The test set is scored once, at the end.
+
+\textbf{Baselines.} scikit-learn is used only for comparison, with matched hyper-parameters: a decision tree at the same depth and leaf size, Ridge regression, a linear SVM (\texttt{LinearSVC}), and a dummy predictor. We also run 5-fold cross-validation on the full training split for the tree (both tasks) and the SVM, each against its scikit-learn counterpart. All seeds are fixed (42); repeated runs give identical numbers.
