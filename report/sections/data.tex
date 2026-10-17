@@ -1,0 +1,25 @@
+% Section III -- Data and Preprocessing  (owner: Emiliya Abdulhalimova)
+\section{Data and Preprocessing}
+\textbf{Source.} The bina.az sale-listing scrape has 100{,}775 rows and 51 raw columns. We parse it into 19 working columns. Areas arrive as Azerbaijani text (``145 m\texorpdfstring{\textsuperscript{2}}{2}''), so a parser extracts the number. The raw area column is in m\textsuperscript{2} for flats but the land-plot area is in \emph{sot} (1 sot $=100$~m\textsuperscript{2}); we convert land area separately instead of mixing the two units.
+
+\textbf{Cleaning funnel.} Table~\ref{tab:funnel} lists each step. Most of the loss is deduplication: 36{,}990 rows are repeat scrapes of the same \texttt{item\_id}, and we keep the latest scrape so no listing can appear in two splits. A further 544 ``reposted twins'' (same advert posted again under a new id) are removed. Scope keeps Baku and three residential categories (new build, old build, house/garden house). The domain filters drop rows with price outside 10{,}000--5{,}000{,}000~AZN, area outside 10--2{,}000~m\textsuperscript{2}, or price per m\textsuperscript{2} outside 200--20{,}000~AZN. Filtered rows are removed, never clipped, and the luxury tail is kept.
+
+\begin{table}[t]
+  \centering
+  \caption{Cleaning funnel (counts recorded in \texttt{preprocessing\_report.json}).}
+  \label{tab:funnel}
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    Step & Rows & Removed \\
+    \midrule
+    Raw scrape                      & 100{,}775 & --- \\
+    Deduplicate                     & 63{,}241  & 37{,}534 \\
+    Scope (Baku, residential)       & 57{,}069  & 6{,}172 \\
+    Value windows (price, area)  & 57{,}003 & 66 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Targets and split.} Task~A predicts $\log(\text{price})$. Task~B is a premium/standard tier, premium meaning price $\ge$ the \emph{training-set} median, 209{,}000~AZN. The cleaned rows are split 70/15/15 with seed 42 into 39{,}902 train, 8{,}550 validation and 8{,}551 test rows. Premium share is 0.500, 0.505 and 0.501 in the three splits. Split identity hashes are stored so a re-run is provably the same split.
+
+\textbf{Features and leakage.} The model matrix has 82 columns: 11 continuous (log area, log land, rooms, latitude, longitude, floor, building floors, distance to the city centre, floor ratio, area per room, log land ratio), 9 binary flags (floor known, repaired, title deed, mortgage, VIP, featured, owner-sold, ground floor, top floor), 3 property-type indicators and 59 location indicators (58 locations with at least 100 training rows, plus ``other''). Every statistic used to transform data (median fills, scaling mean and standard deviation, the tier threshold, the location list) is measured on the training split only. We removed three columns that contain the answer: \texttt{unit\_price}, \texttt{total\_price} and \texttt{description}. An audit confirms none survives into the features and that no numeric feature has $|r|>0.95$ with price (largest: rooms, 0.53).
