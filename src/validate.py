@@ -406,8 +406,9 @@ def write_markdown(v: Validator, report, arrays, tiers, tables, plots: list[str]
          " `item_id` (latest scrape kept before splitting, so no listing leaks"
          " across splits). Scope drops Torpaq/Obyekt/Ofis/Qaraj (~9.4% of"
          " deduped rows) to keep a homogeneous residential task. Domain sanity"
-         " filters remove only 19 typo rows; the luxury tail is kept and handled"
-         " via `log(price)` + train-fitted winsorization (no rows removed)."),
+         f" filters remove {report['domain_filters']['total_removed_by_domain_filters']:,}"
+         " rows outside the declared price / area / price-per-m² windows (removed,"
+         " not clipped); the luxury tail inside the windows is kept and modelled on `log(price)`."),
         "",
         "## Failed checks",
         "",

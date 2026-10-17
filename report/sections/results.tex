@@ -1,0 +1,72 @@
+% Sections VI-VIII -- Results, Discussion, Conclusion  (owner: Murad Bagirzade)
+\section{Results}
+Table~\ref{tab:a} and Table~\ref{tab:b} give the headline numbers. Baselines were run on validation only.
+
+\begin{table}[t]
+  \centering
+  \caption{Task A, regression on $\log$ price (RMSE lower is better).}
+  \label{tab:a}
+  \footnotesize\setlength{\tabcolsep}{3pt}\begin{tabular}{@{}lcccc@{}}
+    \toprule
+    Model & RMSE val & RMSE test & $R^2$ test & Err.\ test \\
+    \midrule
+    Dummy (mean)            & 0.632 & ---   & ---   & --- \\
+    Ridge                   & 0.241 & ---   & ---   & --- \\
+    scikit-learn tree       & 0.239 & ---   & ---   & --- \\
+    Ours: tree (depth 10)   & 0.238 & 0.245 & 0.856 & 17.8\% \\
+    Ours: bagging           & \textbf{0.205} & \textbf{0.218} & \textbf{0.886} & \textbf{14.9\%} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \caption{Task B, premium vs.\ standard tier.}
+  \label{tab:b}
+  \footnotesize\setlength{\tabcolsep}{3pt}\begin{tabular}{@{}lcccc@{}}
+    \toprule
+    Model & Acc val & AUC val & Acc test & AUC test \\
+    \midrule
+    Dummy                      & 0.494 & ---   & ---   & --- \\
+    LinearSVC                  & 0.908 & 0.970 & ---   & --- \\
+    scikit-learn tree          & 0.911 & 0.967 & ---   & --- \\
+    Ours: tree (depth 8)       & 0.911 & 0.966 & 0.916 & 0.970 \\
+    Ours: SVM                  & 0.903 & 0.967 & 0.908 & 0.970 \\
+    Ours: bagging              & \textbf{0.929} & \textbf{0.981} & \textbf{0.934} & \textbf{0.983} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Our code matches the reference.} Our tree is within 0.0005 RMSE of scikit-learn on validation (0.2383 vs.\ 0.2388) and within 0.0002 accuracy on Task~B (0.9113 vs.\ 0.9111). Our Pegasos SVM reaches 0.903 accuracy against 0.908 for the exact linear solver, and the same AUC to within 0.003.
+
+\textbf{Bagging helps both tasks.} Averaging 30 trees cuts regression MSE from 0.0568 to 0.0421 on validation (25.9\%) and from 0.0598 to 0.0473 on test (20.9\%). For classification it lifts validation AUC from 0.9664 to 0.9808. Out-of-bag estimates, which use no validation data, are $R^2=0.888$ and accuracy 0.929, close to the validation scores, which is independent evidence that the ensemble is not overfitting.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig4_model_comparison.png}
+  \caption{Our models against the scikit-learn baselines.}
+  \label{fig:cmp}
+\end{figure}
+
+\textbf{Two measured design choices.} (i) Using the single tree's swept depth (8) for ensemble members was a mistake: at depth 8 the ensemble scores accuracy 0.914, AUC 0.976, OOB 0.916; at depth 16 it scores 0.929, 0.981, 0.929, a gain of 1.4 points of accuracy. (ii) Lowering the SVM $\lambda$ from 0.01 to 0.001 raised validation accuracy from 0.890 to 0.903 and AUC from 0.957 to 0.967.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig5_error_analysis.png}
+  \caption{Task A error by price decile (validation).}
+  \label{fig:err}
+\end{figure}
+
+\textbf{Cross-validation and nonlinear SVM.} Five-fold cross-validation agrees with the held-out numbers and with scikit-learn: tree log-RMSE $0.246\pm0.003$ (scikit-learn $0.246\pm0.004$), tree accuracy $0.909\pm0.001$ (both), Pegasos accuracy $0.904\pm0.002$ (LinearSVC $0.904\pm0.002$). The random-Fourier-feature SVM ($\gamma=0.01$, 8{,}000 rows) reaches test accuracy 0.842 and AUC 0.921, below both the RBF SVC on the same rows (0.875, 0.955) and the linear SVM (0.908, 0.970): a nonlinear boundary did not help here at this sample size. The regression tree's importances are dominated by log area (0.63) and distance to the city centre (0.24).
+
+\section{Discussion and Limitations}
+\textbf{Where the model fails.} Error is not uniform (Fig.~\ref{fig:err}). For the single tree on validation, the median error is 10.2\% for listings between 100k and 350k~AZN, about 15.6\% for 350k--1M, and 33\% above 1M (117 listings); the cheapest listings (below 100k) also reach a 15.5\% median. Luxury properties are rare, strongly priced by unobserved features such as view and finish, and the tree can only average a few similar training rows.
+
+\textbf{Bias and variance.} A single deep tree overfits, which is why averaging trees helps: it removes variance and leaves bias where it was. The SVM is linear, so it cannot use feature interactions, yet matches the tree's ranking quality (AUC 0.970 for both).
+
+\textbf{Accuracy vs.\ ranking.} A shallow tree has impure leaves and gives graded probabilities; a deep tree has nearly pure leaves and outputs values near 0 or 1. Accuracy ignores this, but AUC measures ranking, so the depth that maximises one does not maximise the other. Bagging removes the trade-off.
+
+\textbf{Limitations.} (1) Depth and $\lambda$ are tuned on 6{,}000 rows but used on 39{,}902, so the chosen depths are probably slightly shallow. (2) Ensemble depth is fixed by one measurement, not its own sweep. (3) Our tree rechecks every threshold from scratch, so a full fit takes seconds to minutes; sorting each feature once and sweeping with running totals would be much faster. (4) The data are asking prices from one scrape, not sale prices. (5) Our \texttt{min\_impurity\_decrease} compares the raw gain, whereas scikit-learn scales it by node size, so the same value prunes differently.
+
+\section{Conclusion}
+We built a decision tree, a Pegasos SVM and a bagging ensemble from scratch on 57{,}003 cleaned Baku listings. The tree and SVM match scikit-learn, and bagging gives the best results on both tasks: $R^2=0.886$ and 14.9\% typical error for price, 93.4\% accuracy and AUC 0.983 for the tier. Next steps would be a proper sweep of ensemble depth and size, a faster split search, and per-segment models for luxury listings.
